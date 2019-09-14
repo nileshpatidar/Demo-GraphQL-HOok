@@ -1,0 +1,87 @@
+   // var Connection = await ConnectionModel.aggregate([
+            //     { $match: { $or: [{ friend_member_id: member_id, connection_status: 'Connection', status: 'Active' }, { member_id: member_id, connection_status: 'Connection', status: 'Active' }] } },
+            //     { $project: { member_id: 1, friend_member_id: 1 } },
+            //     {
+            //         "$group": {
+            //             "_id": 0, "userid": {
+            //                 "$push": {
+            //                     "$cond": [    // {$or: [
+            //                         { "$eq": ["$member_id", member_id] },
+            //                         // { "$eq": ["$friend_member_id", member_id] }
+            //                         // ]},
+            //                         "$friend_member_id",
+            //                         "$member_id"
+            //                     ]
+            //                 }
+            //             }
+            //         }
+            //     },
+            // ])
+            // var userid = Connection[0].userid
+            ///****************FOOOLLLOOOOOWWWW */
+            // {
+            // var followfilterlookup={    $lookup:
+            //     {
+            //         from: "follow_filters",
+            //         let: { followid: "$follow_id" },
+            //         pipeline: [
+            //             {
+            //                 $match:
+            //                 {
+            //                     $expr:
+            //                     {
+            //                         $and:
+            //                             [
+            //                                 { $eq: ["$follow_id", "$$followid"] },
+            //                                 { $eq: ["$status", "Yes"] },
+
+            //                             ]
+            //                     }
+            //                 }
+            //             },
+            //             { $project: { post_type: 1 } }
+            //         ],
+            //         as: "Follower"
+            //     }
+            // },}
+            var Follow = await FollowModel.aggregate([
+                { $match: { member_id: member_id, status: 'Active' } },
+                { $project: { member_id: 1, following_id: 1, follow_id: 1 } },
+                //follofilter lookup
+                {
+                    "$group": {
+                        "_id": 0, post_type: { "$push": "$following_id" }
+                    }
+                },
+                { $project: { post_type: 1, _id: 0 } },
+                { $sort: { create_date: -1 } },
+            ])
+            var posttype = Follow[0].post_type
+            var hook = { "location": { $cond: { if: { $eq: ["hoookedup", "$post_type"] }, then: "$location", else: "$$REMOVE" } } }
+            var snap = { "visibility": { $cond: { if: { $eq: ["snapit", "$post_type"] }, then: "$visibility", else: "$$REMOVE" } }, }
+            // var connectionmatchstage = {
+            //     "$match": {
+            //         $or: [{ "member_id": { "$in": userid }, status: 'Active', visibility: 'Connections' },
+            //         { "member_id": member_id, status: 'Active' }
+            //         ],
+            //         ...condition
+            //         // member_id: member_id
+            //     },
+            // },
+            var result = await PostSchema.aggregate([
+                {
+                    "$match": {
+                        $or: [
+                            { "member_id": { "$in": posttype }, status: 'Active', visibility: 'Connections' },
+                            // { "member_id": member_id, status: 'Active' }
+                        ],
+                        ...condition
+                        // member_id: member_id
+                    },
+                },
+                { $project: { ...hook, ...snap, "post_type": 1, "member_id": 1, "post_id": 1 } },
+                { $sort: { create_date: -1 } },
+                { $skip: skip },
+                { $limit: limit }
+            ])
+            return result;
